@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <title>🎡 Check in nhận quà liền tay</title>
+    <style>
+      body {
+        font-family: Verdana, sans-serif;
+        margin: 0;
+        padding: 0;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background: linear-gradient(135deg, #ff9a9e, #fad0c4, #fbc2eb);
+        background-size: 600% 600%;
+        animation: gradientBG 15s ease infinite;
+        padding: 20px;
+      }
+      @keyframes gradientBG {
+        0% {
+          background-position: 0% 50%;
+        }
+        50% {
+          background-position: 100% 50%;
+        }
+        100% {
+          background-position: 0% 50%;
+        }
+      }
+      h2 {
+        color: #fff;
+        text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+        text-align: center;
+        margin-bottom: 30px;
+      }
+
+      /* Container 2 cột */
+      .container {
+        display: flex;
+        gap: 50px;
+        align-items: flex-start;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+
+      /* Form */
+      #playerForm {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        background: rgba(255, 255, 255, 0.9);
+        padding: 25px;
+        border-radius: 15px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        min-width: 280px;
+      }
+
+      #playerForm label {
+        font-weight: 600;
+      }
+      #playerForm input {
+        padding: 10px 15px;
+        border-radius: 8px;
+        border: 1px solid #ccc;
+        font-size: 14px;
+        outline: none;
+      }
+      #playerForm input:focus {
+        border-color: #ff6a6a;
+        box-shadow: 0 0 5px rgba(255, 106, 106, 0.5);
+      }
+      #playerForm button {
+        padding: 12px;
+        border: none;
+        border-radius: 10px;
+        background: linear-gradient(45deg, #ff6a6a, #ffb86a);
+        color: #fff;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      #playerForm button:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+      }
+
+      /* Vòng quay */
+      .wheel-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+        background: rgba(255, 255, 255, 0.9);
+        padding: 25px;
+        border-radius: 15px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+      }
+      canvas {
+        background: #fff;
+        border-radius: 50%;
+        box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2);
+      }
+      #spinBtn {
+        padding: 12px 25px;
+        border: none;
+        border-radius: 10px;
+        background: linear-gradient(45deg, #ff6a6a, #ffb86a);
+        color: white;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      #spinBtn:disabled {
+        background: #aaa;
+        cursor: not-allowed;
+      }
+      #spinBtn:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+      }
+      @media (max-width: 900px) {
+        .container {
+          flex-direction: column;
+          align-items: center;
+          gap: 30px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <h2>🎁 Check in ngay nhận quà liền tay - Minigame 🎁</h2>
+
+    <div class="container">
+      <form id="playerForm">
+        <label for="name">Tên của bạn:</label>
+        <input type="text" id="name" placeholder="Nhập tên" required />
+        <label for="phone">Số điện thoại:</label>
+        <input
+          type="tel"
+          id="phone"
+          placeholder="Nhập số điện thoại"
+          required
+          pattern="0[0-9]{8,10}"
+          title="Vui lòng nhập số điện thoại hợp lệ"
+        />
+        <button type="submit">Check in ngay</button>
+      </form>
+
+      <div class="wheel-container">
+        <canvas id="wheel" width="530" height="550"></canvas>
+        <button id="spinBtn" disabled>Quay!</button>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/2.1.3/TweenMax.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/zarocknz/javascript-winwheel/Winwheel.min.js"></script>
+
+    <script>
+      const apiUrl = "/spin";
+      let player = {};
+
+      // Validate form & check phone
+      document
+        .getElementById("playerForm")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const name = document.getElementById("name").value.trim();
+          const phone = document.getElementById("phone").value.trim();
+          if (!name) {
+            alert("🚫 Vui lòng nhập tên!");
+            return;
+          }
+          const phoneInput = document.getElementById("phone");
+          if (!phoneInput.checkValidity()) {
+            alert("🚫 Số điện thoại không hợp lệ!");
+            return;
+          }
+
+          try {
+            const res = await fetch(
+              `/check-phone?phone=${encodeURIComponent(phone)}`
+            );
+            const data = await res.json();
+            if (data.used) {
+              alert("🚫 Số điện thoại này đã quay rồi!");
+              document.getElementById("spinBtn").disabled = true;
+              return;
+            }
+          } catch (err) {
+            console.error(err);
+            alert("❌ Lỗi server!");
+            return;
+          }
+
+          player.name = name;
+          player.phone = phone;
+          document.getElementById("spinBtn").disabled = false;
+          alert(`✅ Xin chào ${name}, bạn có thể quay!`);
+        });
+
+      // Cấu hình bánh xe
+      const wheel = new Winwheel({
+        canvasId: "wheel",
+        numSegments: 6,
+        outerRadius: 250,
+        textFontSize: 14,
+        textFontFamily: "Arial, Helvetica, sans-serif",
+        textOrientation: "horizontal",
+        textAlignment: "outer",
+        textMargin: 15,
+        segments: [
+          { fillStyle: "#ff7b7b", text: "Voucher 10% cho hoá đơn bất kì" },
+          { fillStyle: "#7bcaff", text: "Voucher 5% cho hoá đơn bất kì" },
+          { fillStyle: "#7eff7b", text: "Chúc bạn may mắn lần sau" },
+          { fillStyle: "#fff87b", text: "Bạn nhận được món quà nhỏ" },
+          { fillStyle: "#ff7be5", text: "Bạn nhận được một đôi tất" },
+          { fillStyle: "#cccccc", text: "Voucher 200k cho HĐ từ 400k" },
+        ],
+        animation: {
+          type: "spinToStop",
+          duration: 5,
+          spins: 8,
+          easing: "Power2.easeOut",
+          callbackFinished: onSpinComplete,
+        },
+      });
+
+      // Vẽ mũi tên
+      const canvas = document.getElementById("wheel");
+      const ctx = canvas.getContext("2d");
+      function drawPointer() {
+        const centerX = canvas.width / 2;
+        const pointerHeight = 25;
+        const pointerWidth = 20;
+        ctx.save();
+        ctx.translate(centerX, 0);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(-pointerWidth / 2, pointerHeight);
+        ctx.lineTo(pointerWidth / 2, pointerHeight);
+        ctx.closePath();
+        ctx.fillStyle = "red";
+        ctx.shadowColor = "rgba(0,0,0,0.3)";
+        ctx.shadowBlur = 4;
+        ctx.shadowOffsetX = 1;
+        ctx.shadowOffsetY = 1;
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = "black";
+        ctx.stroke();
+        ctx.restore();
+      }
+      drawPointer();
+      wheel.animation.callbackBefore = function () {
+        drawPointer();
+      };
+
+      // Quay bánh xe
+      document.getElementById("spinBtn").addEventListener("click", () => {
+        wheel.stopAnimation(false); // reset animation
+        wheel.rotationAngle = 0; // quay về góc 0
+        wheel.draw(); // vẽ lại bánh xe
+        wheel.animation.spins = 8; // số vòng quay
+        wheel.animation.duration = 5; // thời gian quay
+        wheel.startAnimation(); // bắt đầu quay
+      });
+
+      // Khi quay xong
+      function onSpinComplete(segment) {
+        const result = segment.text;
+        document.getElementById("spinBtn").disabled = true;
+        alert(`🎉 Chúc mừng ${player.name}! Bạn trúng: ${result}`);
+
+        fetch(apiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: player.name,
+            phone: player.phone,
+            result,
+          }),
+        })
+          .then((res) => res.json())
+          .then((data) => console.log(data))
+          .catch((err) => console.error(err));
+      }
+    </script>
+  </body>
+</html>
