@@ -159,6 +159,11 @@
     <script>
       const apiUrl = "/spin";
       let player = {};
+      function normalizePhone(phone) {
+        phone = phone.replace(/\s+/g, ""); // bỏ khoảng trắng
+        if (phone.startsWith("0")) phone = phone.slice(1);
+        return phone;
+      }
 
       // Validate form & check phone
       document
@@ -167,6 +172,7 @@
           e.preventDefault();
           const name = document.getElementById("name").value.trim();
           const phone = document.getElementById("phone").value.trim();
+
           if (!name) {
             alert("🚫 Vui lòng nhập tên!");
             return;
@@ -179,7 +185,7 @@
 
           try {
             const res = await fetch(
-              `/check-phone?phone=${encodeURIComponent(phone)}`
+              `/check-phone?phone=${encodeURIComponent(normalizePhone(phone))}`
             );
             const data = await res.json();
             if (data.used) {

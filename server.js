@@ -1,81 +1,77 @@
 import express from "express";
 import cors from "cors";
-import fs from "fs";
+import fetch from "node-fetch";
 import path from "path";
-import { fileURLToPath } from "url";
 
+const __dirname = path.resolve();
 const app = express();
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "public"))); // phục vụ FE
 
-const DATA_FILE = path.join(__dirname, "public", "results.csv");
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
 
-function formatDate(date) {
-  const pad = (n) => (n < 10 ? "0" + n : n);
-  return (
-    date.getFullYear() +
-    "-" +
-    pad(date.getMonth() + 1) +
-    "-" +
-    pad(date.getDate()) +
-    " " +
-    pad(date.getHours()) +
-    ":" +
-    pad(date.getMinutes()) +
-    ":" +
-    pad(date.getSeconds())
-  );
+// Chuẩn hóa số điện thoại: bỏ khoảng trắng, giữ số, bỏ số 0 đầu
+function normalizePhone(phone) {
+  phone = phone.replace(/\s+/g, ""); // bỏ khoảng trắng
+  if (phone.startsWith("0")) phone = phone.slice(1);
+  return phone;
 }
 
-// ✅ Helper: đọc CSV và trả về mảng SĐT đã quay
-function getUsedPhones() {
-  if (!fs.existsSync(DATA_FILE)) return [];
-  const content = fs.readFileSync(DATA_FILE, "utf8");
-  const lines = content.split("\n").slice(1); // bỏ header
-  return lines.map((line) => line.split(",")[1]?.trim()).filter((v) => v); // bỏ rỗng
-}
+const SHEET_URL =
+  "https://script.google.com/macros/s/AKfycbypqWfHK5gMJQ_azTrmc3CLDixHLjOJAIj12v4jjJWfb3JiwyKzkUem5ChcgggmFh21bw/exec"; // đổi thành URL Apps Script của bạn
 
-// API: kiểm tra SĐT
-app.get("/check-phone", (req, res) => {
+// API kiểm tra số điện thoại
+app.get("/check-phone", async (req, res) => {
   const phone = req.query.phone?.trim();
   if (!phone) return res.status(400).json({ error: "Thiếu số điện thoại" });
 
-  const usedPhones = getUsedPhones();
-  const used = usedPhones.includes(phone);
+  try {
+    // Gọi Google Sheet (GET), Sheet trả về JSON danh sách số điện thoại đã quay
+    const response = await fetch(SHEET_URL);
+    const data = await response.json();
+    console.log(data);
 
-  res.json({ used });
+    if (data.phones?.includes(Number(phone))) {
+      return res.json({
+        used: true,
+        message: "🚫 Số điện thoại này đã quay rồi!",
+      });
+    }
+    return res.json({ used: false, message: "✅ Bạn có thể quay." });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Lỗi server" });
+  }
 });
 
-// API: lưu kết quả quay
-app.post("/spin", (req, res) => {
+// API lưu kết quả quay
+app.post("/spin", async (req, res) => {
   const { name, phone, result } = req.body;
   if (!name || !phone || !result)
     return res.status(400).json({ error: "Thiếu dữ liệu" });
-  if (!fs.existsSync(DATA_FILE)) {
-    fs.writeFileSync(DATA_FILE, "Name,Phone,Result,Time\n", "utf8");
-  }
-  // Kiểm tra trùng SĐT trước khi lưu
-  const usedPhones = getUsedPhones();
-  if (usedPhones.includes(phone)) {
-    return res.status(400).json({ error: "Số điện thoại này đã quay rồi!" });
-  }
 
-  // Tạo file nếu chưa có
-  if (!fs.existsSync(DATA_FILE)) {
-    fs.writeFileSync(DATA_FILE, "Name,Phone,Result,Time\n", "utf8");
-  }
-  const now = formatDate(new Date());
-  const line = `${name},${phone},${result},${now}\n`;
-  fs.appendFileSync(DATA_FILE, line, "utf8");
+  try {
+    // Gọi Sheet (POST) để lưu
+    const response = await fetch(SHEET_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, phone, result }),
+    });
 
-  res.json({ success: true });
+    const data = await response.json();
+
+    if (data.error) return res.status(400).json({ error: data.error });
+
+    return res.json({ success: true, message: "🎉 Lưu kết quả thành công!" });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Lỗi server" });
+  }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () =>
-  console.log(`✅ Server đang chạy tại http://localhost:${PORT}`)
-);
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`✅ Server đang chạy tại http://0.0.0.0:${PORT}`);
+});
